@@ -18,7 +18,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -27,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -64,17 +62,12 @@ class MainActivity : ComponentActivity() {
                             contentAlignment = Alignment.Center) {
                             CircularProgressIndicator()
                         }
-                    }
-
-                    if (uiState.error.isNotEmpty()) {
+                    } else if (uiState.error.isNotEmpty()) {
                         Box(Modifier.padding(innerPadding).fillMaxSize(),
                             contentAlignment = Alignment.Center) {
                             Text(uiState.error)
                         }
-                    }
-
-
-                    uiState.data?.let { data ->
+                    } else uiState.data?.let { data ->
                         LazyColumn(modifier = Modifier.padding(innerPadding).padding(horizontal = 16.dp).fillMaxSize()) {
                             items(data) { image ->
                                 AsyncImage(

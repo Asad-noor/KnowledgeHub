@@ -38,12 +38,18 @@ class ImageViewModel: ViewModel() {
     }
 
     private fun getImages(query: String) = viewModelScope.launch {
+        _uiState.update { it.copy(isLoading = true, error = "") }
+
         val result = imageRepository.getImages(query)
 
         if (result.isSuccess) {
-            _uiState.update { UiState(data = result.getOrThrow()) }
+            _uiState.update {
+                it.copy(isLoading = false, data = result.getOrThrow(), error = "")
+            }
         } else {
-            _uiState.update { UiState(error = result.exceptionOrNull()?.message.toString()) }
+            _uiState.update {
+                it.copy(isLoading = false, error = result.exceptionOrNull()?.message.toString())
+            }
         }
     }
 
