@@ -31,7 +31,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.worldvisionsoft.knowledgehub.view.theme.KnowledgeHubTheme
 import com.worldvisionsoft.knowledgehub.viewmodel.ImageViewModel
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val viewModel: ImageViewModel by viewModels()

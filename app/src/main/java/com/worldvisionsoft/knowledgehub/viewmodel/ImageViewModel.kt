@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.worldvisionsoft.knowledgehub.model.remote.ImageRepository
 import com.worldvisionsoft.knowledgehub.model.remote.dtos.Hit
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -13,14 +15,13 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class ImageViewModel: ViewModel() {
+@HiltViewModel
+class ImageViewModel @Inject constructor(
+    private val imageRepository: ImageRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState = _uiState.asStateFlow()
-
-    private val imageRepository: ImageRepository by lazy {
-        ImageRepository()
-    }
 
     private val _query = MutableStateFlow("")
 
