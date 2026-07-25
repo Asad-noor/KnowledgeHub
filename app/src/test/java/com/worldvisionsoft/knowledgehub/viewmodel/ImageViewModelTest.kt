@@ -1,8 +1,11 @@
 package com.worldvisionsoft.knowledgehub.viewmodel
 
+import com.worldvisionsoft.knowledgehub.model.remote.ImageRepository
 import com.worldvisionsoft.knowledgehub.model.remote.dtos.Hit
 import com.worldvisionsoft.knowledgehub.util.FakeImageRepository
 import com.worldvisionsoft.knowledgehub.util.MainDispatcherRule
+import java.io.IOException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -74,5 +77,111 @@ class ImageViewModelTest {
         advanceTimeBy(debounceMillis)
         advanceUntilIdle()
         assertEquals(listOf("cat"), repository.queries)
+    }
+
+    @Test
+    fun `only the last query typed is sent while the user is still typing`() = runTest {
+        val viewModel = ImageViewModel(repository)
+
+        // Someone typing "cat" one letter at a time, faster than the debounce
+        viewModel.updateQuery("c")
+        advanceTimeBy(100)
+        viewModel.updateQuery("ca")
+        advanceTimeBy(100)
+        viewModel.updateQuery("cat")
+        advanceTimeBy(debounceMillis)
+        advanceUntilIdle()
+
+        // Only one network round-trip, for the final text
+        assertEquals(listOf("cat"), repository.queries)
+    }
+
+    @Test
+    fun `an empty query is ignored`() = runTest {
+        val viewModel = ImageViewModel(repository)
+
+        // e.g. the user clearing the search field
+        viewModel.updateQuery("")
+        advanceTimeBy(debounceMillis)
+        advanceUntilIdle()
+
+        assertTrue(repository.queries.isEmpty())
+        assertNull(viewModel.uiState.value.data)
+    }
+
+    @Test
+    fun `re-submitting the same query does not hit the repository twice`() = runTest {
+        val viewModel = ImageViewModel(repository)
+
+        viewModel.updateQuery("cat")
+        advanceTimeBy(debounceMillis)
+        advanceUntilIdle()
+        viewModel.updateQuery("cat")
+        advanceTimeBy(debounceMillis)
+        advanceUntilIdle()
+
+        // distinctUntilChanged drops the duplicate
+        assertEquals(listOf("cat"), repository.queries)
+    }
+
+    @Test
+    fun `isLoading is true while the request is in flight`() = runTest {
+        // A repository that stays suspended until we let it finish
+        val gate = CompletableDeferred<Unit>()
+        val slowRepository = object : ImageRepository {
+            override suspend fun getImages(query: String): Result<List<Hit>> {
+                gate.await()
+                return Result.success(emptyList())
+            }
+        }
+        val viewModel = ImageViewModel(slowRepository)
+
+        viewModel.updateQuery("cat")
+        advanceTimeBy(debounceMillis)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.isLoading)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isLoading)
+    }
+
+    @Test
+    fun `repository failure is surfaced as an error message`() = runTest {
+        repository.result = Result.failure(IOException("no internet"))
+        val viewModel = ImageViewModel(repository)
+
+        viewModel.updateQuery("cat")
+        advanceTimeBy(debounceMillis)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isLoading)
+        assertEquals("no internet", state.error)
+        assertNull(state.data)
+    }
+
+    @Test
+    fun `a successful search clears a previous error`() = runTest {
+        repository.result = Result.failure(IOException("no internet"))
+        val viewModel = ImageViewModel(repository)
+
+        viewModel.updateQuery("cat")
+        advanceTimeBy(debounceMillis)
+        advanceUntilIdle()
+        assertEquals("no internet", viewModel.uiState.value.error)
+
+        // Connectivity is back and the user searches for something else
+        val hits = listOf(Hit("http://img/1.jpg"))
+        repository.result = Result.success(hits)
+        viewModel.updateQuery("dog")
+        advanceTimeBy(debounceMillis)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("", state.error)
+        assertEquals(hits, state.data)
     }
 }
