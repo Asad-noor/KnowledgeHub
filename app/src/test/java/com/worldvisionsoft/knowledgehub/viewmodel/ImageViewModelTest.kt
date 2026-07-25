@@ -149,6 +149,43 @@ class ImageViewModelTest {
     }
 
     @Test
+    fun `a slow response cannot overwrite the result of a newer query`() = runTest {
+        val slowHits = listOf(Hit("http://img/cat.jpg"))
+        val fastHits = listOf(Hit("http://img/dog.jpg"))
+        val firstCallGate = CompletableDeferred<Unit>()
+        val slowFirstRepository = object : ImageRepository {
+            var calls = 0
+            override suspend fun getImages(query: String): Result<List<Hit>> {
+                // Read the counter BEFORE suspending — it will have moved on by the
+                // time the first (slow) call resumes.
+                val isFirstCall = ++calls == 1
+                if (isFirstCall) firstCallGate.await()
+                return Result.success(if (isFirstCall) slowHits else fastHits)
+            }
+        }
+        val viewModel = ImageViewModel(slowFirstRepository)
+
+        // First search hangs on a slow connection
+        viewModel.updateQuery("cat")
+        advanceTimeBy(debounceMillis)
+        advanceUntilIdle()
+
+        // The user gives up and searches for something else, which answers immediately
+        viewModel.updateQuery("dog")
+        advanceTimeBy(debounceMillis)
+        advanceUntilIdle()
+        assertEquals(fastHits, viewModel.uiState.value.data)
+
+        // The first request finally comes back — it must not clobber the newer result
+        firstCallGate.complete(Unit)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(fastHits, state.data)
+        assertFalse(state.isLoading)
+    }
+
+    @Test
     fun `repository failure is surfaced as an error message`() = runTest {
         repository.result = Result.failure(IOException("no internet"))
         val viewModel = ImageViewModel(repository)

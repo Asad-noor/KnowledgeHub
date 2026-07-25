@@ -38,7 +38,12 @@ class ImageViewModel @Inject constructor(
         }
     }
 
-    private fun getImages(query: String) = viewModelScope.launch {
+    /**
+     * Suspends instead of launching its own coroutine on purpose: it runs inside the
+     * [collectLatest] above, so a newer query cancels the in-flight request and its
+     * (now stale) response can never overwrite the newer one in [_uiState].
+     */
+    private suspend fun getImages(query: String) {
         _uiState.update { it.copy(isLoading = true, error = "") }
 
         val result = imageRepository.getImages(query)
