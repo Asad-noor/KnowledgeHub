@@ -29,6 +29,10 @@ class ImageViewModel @Inject constructor(
         _query.update { query }
     }
 
+    fun selectHit(hit: Hit?) {
+        _uiState.update { it.copy(selectedHit = hit) }
+    }
+
     init {
         viewModelScope.launch {
             _query.filter { it.isNotEmpty() }
@@ -64,5 +68,6 @@ class ImageViewModel @Inject constructor(
 data class UiState(
     val isLoading: Boolean= false,
     val error: String ="",
-    val data: List<Hit>? = null
+    val data: List<Hit>? = null,
+    val selectedHit: Hit? = null
 )
